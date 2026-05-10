@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-WORK_DIR = Path("/mnt/data/workspace/claw-eval-0424/claw-eval")
+WORK_DIR = Path("/mnt/data/workspace/claw-eval-ecs")
 WORKER_PID = WORK_DIR / "worker.pid"
 WORKER_LOG = WORK_DIR / "worker.log"
 

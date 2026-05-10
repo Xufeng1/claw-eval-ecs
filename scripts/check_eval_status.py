@@ -3,9 +3,9 @@
 claw-eval 评测任务运行状态检查脚本
 
 用法:
-    python3 /mnt/data/workspace/claw-eval-0424/check_eval_status.py
+    python3 /mnt/data/workspace/claw-eval-ecs/scripts/check_eval_status.py
 
-读取 /mnt/data/workspace/claw-eval-0424/claw-eval 下的运行信息并输出:
+读取 /mnt/data/workspace/claw-eval-ecs 下的运行信息并输出:
   - 创建时间 / 模型信息 / Judge模型信息 / 任务启动配置
   - 运行状态 / 运行进度 / 预计剩余完成时间
   - 完成任务数 / 已完成任务评分汇总
@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-WORK_DIR = Path("/mnt/data/workspace/claw-eval-0424/claw-eval")
+WORK_DIR = Path("/mnt/data/workspace/claw-eval-ecs")
 TRACE_BASE = WORK_DIR / "claw_traces"
 WORKER_LOG = WORK_DIR / "worker.log"
 WORKER_PID = WORK_DIR / "worker.pid"
@@ -124,7 +124,9 @@ def parse_worker_log() -> dict:
                 args_str = m2.group(1)
                 for token_pair in [("--model", "model"), ("--base-url", "base_url"),
                                    ("--parallel", "parallel"), ("--trials", "trials"),
-                                   ("--api-key", "api_key_prefix")]:
+                                   ("--api-key", "api_key_prefix"),
+                                   ("--tag", "tag"), ("--filter", "filter"),
+                                   ("--range", "range")]:
                     flag, key = token_pair
                     m3 = re.search(rf"{flag}\s+(\S+)", args_str)
                     if m3:
@@ -210,7 +212,7 @@ def get_running_containers() -> list[dict]:
         return []
 
 
-def analyze_traces(trace_dir: Path) -> dict:
+def analyze_traces(trace_dir: Path, log_info: dict | None = None) -> dict:
     """分析 trace 目录下的所有 .jsonl 文件."""
     result = {
         "batch_results": [],
@@ -243,10 +245,38 @@ def analyze_traces(trace_dir: Path) -> dict:
             "mtime": fp.stat().st_mtime,
         })
 
-    # 读取 tasks 目录
+    # 读取 tasks 目录, 按启动时的 --tag / --filter / --range 过滤
     tasks_dir = WORK_DIR / "tasks"
     if tasks_dir.exists():
-        result["all_tasks"] = sorted([d.name for d in tasks_dir.iterdir() if d.is_dir()])
+        all_dirs = sorted([d.name for d in tasks_dir.iterdir() if d.is_dir()])
+        tag = (log_info or {}).get("tag")
+        filt = (log_info or {}).get("filter")
+        rng = (log_info or {}).get("range")
+        if tag or filt or rng:
+            filtered = []
+            for tname in all_dirs:
+                if filt and filt not in tname:
+                    continue
+                if rng:
+                    m_rng = re.match(r"(\d+)-(\d+)", rng)
+                    if m_rng:
+                        lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
+                        m_id = re.search(r"(\d+)", tname)
+                        if m_id and not (lo <= int(m_id.group(1)) <= hi):
+                            continue
+                if tag:
+                    task_yaml = tasks_dir / tname / "task.yaml"
+                    if task_yaml.exists():
+                        task_meta = load_yaml_simple(task_yaml)
+                        task_tags = task_meta.get("tags", [])
+                        if isinstance(task_tags, list) and tag not in task_tags:
+                            continue
+                    else:
+                        continue
+                filtered.append(tname)
+            result["all_tasks"] = filtered
+        else:
+            result["all_tasks"] = all_dirs
 
     # 在 trace 文件中检索 error/traceback (最多 10 个样本)
     # 搜索整行 JSON 文本 (traceback 常被转义嵌入 stderr/content 字段中)
@@ -404,7 +434,7 @@ def main():
 
     print(f"  Trace 目录   : {trace_dir.name}")
 
-    analysis = analyze_traces(trace_dir)
+    analysis = analyze_traces(trace_dir, log_info)
     all_tasks = analysis["all_tasks"]
     trace_files = analysis["trace_files"]
     batch_results = analysis["batch_results"]

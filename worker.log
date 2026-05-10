@@ -1,0 +1,35 @@
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main: ============================================================
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main: Worker started | PID: 3179 | Task: claw-eval
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   argv: ['/mnt/data/workspace/claw-eval-ecs/.venv/bin/eve_ecs_runner', 'worker', '--benchmark', 'claw-eval', '--tag', 'general', '--run-id', 'claw-eval-ecs-fengchen-xf-239006-claude-sonnet-4-6-20260510-195807-747608-i-6weiug5q7amwzf03ulji', '--oss-root', 'oss://antllm-agentic-jp/ant-eve/claw-eval', '--config', './config.yaml', '--model', 'claude-sonnet-4-6', '--base-url', 'https://matrixllm.alipay.com/v1/', '--api-key', 'low-fd1c60dec22f4c0f87b08ec0072a3ec0']
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   cwd:  /mnt/data/workspace/claw-eval-ecs
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main: Environment variables:
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   GODEBUG = execerrdot=0
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   HOME = /root
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   INVOCATION_ID = daaee80f6fc84bca98e462003911bb5d
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   JOURNAL_STREAM = 8:4950
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   JUDGE_BASE_URL = https://matrixllm.alipay.com/v1/
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   JUDGE_MODEL = gemini-3-flash-preview
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   LANG = en_US.UTF-8
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   LOG_LEVEL = DEBUG
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   MEMORY_PRESSURE_WATCH = /sys/fs/cgroup/system.slice/aliyun.service/memory.pressure
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   MEMORY_PRESSURE_WRITE = c29tZSAyMDAwMDAgMjAwMDAwMAA=
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   OPENROUTER_API_KEY = sk-2baa86141af54f8cb545e64de0bf9f83
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PATH = /root/ossutil-2.1.2-linux-amd64:/mnt/data/workspace/claw-eval-ecs/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PS1 = (claw-eval-ecs) # 
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PWD = /mnt/data/workspace/claw-eval-ecs
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PYTHONUNBUFFERED = 1
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   SERP_DEV_KEY = 6bb74ce7b9b9f4c66a8632d42ec33ddf
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   SYSTEMD_EXEC_PID = 2048
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   TERM = vt220
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   USER = root
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   VIRTUAL_ENV = /mnt/data/workspace/claw-eval-ecs/.venv
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   VIRTUAL_ENV_PROMPT = claw-eval-ecs
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main: ============================================================
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main: Config:
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   run_id = 'claw-eval-ecs-fengchen-xf-239006-claude-sonnet-4-6-20260510-195807-747608-i-6weiug5q7amwzf03ulji'
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   eve_file = 'eve_eval_result.json'
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   oss_root = 'oss://antllm-agentic-jp/ant-eve/claw-eval'
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   work_dir = PosixPath('/mnt/data/workspace/claw-eval-ecs')
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   log_file = PosixPath('/mnt/data/workspace/claw-eval-ecs/worker.log')
+2026-05-10 19:58:37,188 [INFO] eve_ecs_runner.main:   extra_args = ['--tag', 'general', '--config', './config.yaml', '--model', 'claude-sonnet-4-6', '--base-url', 'https://matrixllm.alipay.com/v1/', '--api-key', 'low-fd1c60dec22f4c0f87b08ec0072a3ec0']
+2026-05-10 19:58:37,201 [INFO] eve_ecs_runner.benchmarks.claw_eval.executor: Running claw-eval batch: /mnt/data/workspace/claw-eval-ecs/.venv/bin/claw-eval batch --trials 3 --sandbox --trace-dir /mnt/data/workspace/claw-eval-ecs/claw_traces --tag general --config ./config.yaml --model claude-sonnet-4-6 --base-url https://matrixllm.alipay.com/v1/ --api-key low-fd1c60dec22f4c0f87b08ec0072a3ec0
