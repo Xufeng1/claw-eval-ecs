@@ -3,8 +3,8 @@
 model:
   # OpenRouter endpoint (OpenAI-compatible)
   api_key: ${OPENROUTER_API_KEY}
-  base_url: https://openrouter.ai/api/v1
-  model_id: anthropic/claude-opus-4.6
+  base_url: https://matrixllm.alipay.com/v1/
+  model_id: claude-opus-4-6
   context_window: 1000000
 
 judge:
@@ -21,3 +21,4 @@ user_agent_model:
 defaults:
   trace_dir: traces
   tasks_dir: tasks
+  timeout_seconds: 600

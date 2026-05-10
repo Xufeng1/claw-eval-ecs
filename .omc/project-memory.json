@@ -160,6 +160,24 @@
       "accessCount": 1,
       "lastAccessed": 1778389249072,
       "type": "file"
+    },
+    {
+      "path": "optimized_summary.md",
+      "accessCount": 1,
+      "lastAccessed": 1778400524044,
+      "type": "file"
+    },
+    {
+      "path": "config_general.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1778401331372,
+      "type": "file"
+    },
+    {
+      "path": "config_user_agent.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1778401331449,
+      "type": "file"
     }
   ],
   "userDirectives": []
