@@ -31,7 +31,6 @@ configs/
 configs_paper/
 results/
 *.png
-scripts/
 
 regrade/
 yqb_temp/
