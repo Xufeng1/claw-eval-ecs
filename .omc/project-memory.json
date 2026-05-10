@@ -138,6 +138,18 @@
   },
   "hotPaths": [
     {
+      "path": "eve-ecs-runner/tests/test_eve_result.py",
+      "accessCount": 3,
+      "lastAccessed": 1778405963616,
+      "type": "file"
+    },
+    {
+      "path": "eve-ecs-runner/src/eve_ecs_runner/eve_result.py",
+      "accessCount": 2,
+      "lastAccessed": 1778405941313,
+      "type": "file"
+    },
+    {
       "path": "eve-ecs-runner/src/eve_ecs_runner/benchmarks/claw_eval/config.py",
       "accessCount": 1,
       "lastAccessed": 1778389229351,
@@ -177,6 +189,30 @@
       "path": "config_user_agent.yaml",
       "accessCount": 1,
       "lastAccessed": 1778401331449,
+      "type": "file"
+    },
+    {
+      "path": "scripts/check_eval_status.py",
+      "accessCount": 1,
+      "lastAccessed": 1778405836450,
+      "type": "file"
+    },
+    {
+      "path": "src/claw_eval/cli.py",
+      "accessCount": 1,
+      "lastAccessed": 1778405836509,
+      "type": "file"
+    },
+    {
+      "path": "src/claw_eval/models/scoring.py",
+      "accessCount": 1,
+      "lastAccessed": 1778405836570,
+      "type": "file"
+    },
+    {
+      "path": "eve-ecs-runner/src/eve_ecs_runner/benchmarks/claw_eval/executor.py",
+      "accessCount": 1,
+      "lastAccessed": 1778405847739,
       "type": "file"
     }
   ],

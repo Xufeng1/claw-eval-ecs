@@ -41,3 +41,4 @@ others/
 claw_traces/
 eve_eval_result.json
 worker.pid
+.omc

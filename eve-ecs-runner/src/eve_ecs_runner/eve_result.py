@@ -69,7 +69,15 @@ class EveResult:
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        report = d.pop("report", {})
+        for key, value in report.items():
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    d[f"{key}_{sub_key}"] = sub_value
+            else:
+                d[key] = value
+        return d
 
     @classmethod
     def error(cls, error_msg: str) -> EveResult:
