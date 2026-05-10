@@ -1,0 +1,166 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778388985239,
+  "projectRoot": "/Users/fengchen/PycharmProjects/claw-eval-ecs",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml",
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": null,
+        "category": "backend"
+      },
+      {
+        "name": "pytest",
+        "version": null,
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "scripts",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "eve-ecs-runner": {
+      "path": "eve-ecs-runner",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1778388985185,
+      "keyFiles": [
+        "README.md",
+        "pyproject.toml",
+        "uv.lock"
+      ]
+    },
+    "mock_services": {
+      "path": "mock_services",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778388985186,
+      "keyFiles": [
+        "_base.py"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 3,
+      "lastAccessed": 1778388985186,
+      "keyFiles": [
+        "cleanup_containers.sh",
+        "test_sandbox.sh",
+        "validate_tasks.py"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778388985186,
+      "keyFiles": []
+    },
+    "tasks": {
+      "path": "tasks",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778388985187,
+      "keyFiles": []
+    },
+    "eve-ecs-runner/docs": {
+      "path": "eve-ecs-runner/docs",
+      "purpose": "Documentation",
+      "fileCount": 1,
+      "lastAccessed": 1778388985188,
+      "keyFiles": []
+    },
+    "eve-ecs-runner/src": {
+      "path": "eve-ecs-runner/src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778388985188,
+      "keyFiles": []
+    },
+    "eve-ecs-runner/tests": {
+      "path": "eve-ecs-runner/tests",
+      "purpose": "Test files",
+      "fileCount": 6,
+      "lastAccessed": 1778388985188,
+      "keyFiles": [
+        "__init__.py",
+        "test_base_config.py",
+        "test_eve_result.py"
+      ]
+    },
+    "mock_services/config": {
+      "path": "mock_services/config",
+      "purpose": "Configuration files",
+      "fileCount": 1,
+      "lastAccessed": 1778388985189,
+      "keyFiles": [
+        "server.py"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "eve-ecs-runner/src/eve_ecs_runner/benchmarks/claw_eval/config.py",
+      "accessCount": 1,
+      "lastAccessed": 1778389229351,
+      "type": "file"
+    },
+    {
+      "path": "eve-ecs-runner/src/eve_ecs_runner/base_config.py",
+      "accessCount": 1,
+      "lastAccessed": 1778389248958,
+      "type": "file"
+    },
+    {
+      "path": "eve-ecs-runner/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1778389249016,
+      "type": "file"
+    },
+    {
+      "path": "eve-ecs-runner/src/eve_ecs_runner/storage.py",
+      "accessCount": 1,
+      "lastAccessed": 1778389249072,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
