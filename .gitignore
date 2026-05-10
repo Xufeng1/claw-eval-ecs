@@ -35,3 +35,9 @@ results/
 regrade/
 yqb_temp/
 others/
+
+# Local files
+.env
+claw_traces/
+eve_eval_result.json
+worker.pid

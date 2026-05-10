@@ -443,7 +443,7 @@ def main():
 
     if batch_results:
         total_wall_completed = sum(
-            sum(tr["wall_time_s"] for tr in t["trials"])
+            sum(tr.get("wall_time_s", 0) for tr in t["trials"])
             for t in batch_results
         )
         total_trials_completed = sum(len(t["trials"]) for t in batch_results)
@@ -510,11 +510,11 @@ def main():
               f"平均分 {avg:.3f}")
 
         # 资源消耗
-        total_tokens = sum(sum(tr["tokens"] for tr in t["trials"]) for t in batch_results)
-        total_input = sum(sum(tr["model_input_tokens"] for tr in t["trials"]) for t in batch_results)
-        total_output = sum(sum(tr["model_output_tokens"] for tr in t["trials"]) for t in batch_results)
-        total_wall = sum(sum(tr["wall_time_s"] for tr in t["trials"]) for t in batch_results)
-        total_model = sum(sum(tr["model_time_s"] for tr in t["trials"]) for t in batch_results)
+        total_tokens = sum(sum(tr.get("tokens", 0) for tr in t["trials"]) for t in batch_results)
+        total_input = sum(sum(tr.get("model_input_tokens", 0) for tr in t["trials"]) for t in batch_results)
+        total_output = sum(sum(tr.get("model_output_tokens", 0) for tr in t["trials"]) for t in batch_results)
+        total_wall = sum(sum(tr.get("wall_time_s", 0) for tr in t["trials"]) for t in batch_results)
+        total_model = sum(sum(tr.get("model_time_s", 0) for tr in t["trials"]) for t in batch_results)
 
         print(f"\n  --- 资源消耗 (已完成部分) ---")
         print(f"  总 tokens   : {total_tokens:>12,}")
