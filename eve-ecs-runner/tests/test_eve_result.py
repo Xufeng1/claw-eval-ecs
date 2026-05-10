@@ -21,10 +21,40 @@ class TestEveResultDefaults(unittest.TestCase):
         self.assertEqual(d["score"], 85.0)
         self.assertEqual(d["judge_ratio"], 1.0)
         self.assertEqual(d["detail_oss_url"], "oss://bucket/results.tgz")
-        self.assertIn("report", d)
+        self.assertNotIn("report", d)
         self.assertIn("details", d)
         self.assertIn("judge_details", d)
         self.assertIn("metadata", d)
+
+    def test_to_dict_flattens_report(self):
+        r = EveResult(
+            score=50.0,
+            report={
+                "total_instances": 300,
+                "resolved_instances": 171,
+                "trials_per_task": 3,
+                "metrics": {
+                    "pass_at_k": 171,
+                    "pass_hat_k": 103,
+                    "avg_score": 0.546,
+                },
+                "resource_usage": {
+                    "total_tokens": 999,
+                    "model_input_tokens": 600,
+                },
+            },
+        )
+        d = r.to_dict()
+        self.assertNotIn("report", d)
+        self.assertEqual(d["total_instances"], 300)
+        self.assertEqual(d["resolved_instances"], 171)
+        self.assertEqual(d["trials_per_task"], 3)
+        self.assertEqual(d["metrics_pass_at_k"], 171)
+        self.assertEqual(d["metrics_pass_hat_k"], 103)
+        self.assertEqual(d["metrics_avg_score"], 0.546)
+        self.assertEqual(d["resource_usage_total_tokens"], 999)
+        self.assertEqual(d["resource_usage_model_input_tokens"], 600)
+        self.assertEqual(d["score"], 50.0)
 
 
 class TestEveResultError(unittest.TestCase):
@@ -36,6 +66,14 @@ class TestEveResultError(unittest.TestCase):
         self.assertEqual(r.report["resolved_instances"], 0)
         self.assertEqual(r.metadata["status"], "failed")
         self.assertIn("timestamp", r.metadata)
+
+    def test_error_factory_to_dict(self):
+        r = EveResult.error("something broke")
+        d = r.to_dict()
+        self.assertNotIn("report", d)
+        self.assertEqual(d["error"], "something broke")
+        self.assertEqual(d["total_instances"], 0)
+        self.assertEqual(d["resolved_instances"], 0)
 
 
 class TestJudgeDetail(unittest.TestCase):
