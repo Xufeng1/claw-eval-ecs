@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd eve-ecs-runner && grep -r \\\"timeout_seconds\\\\|timeout\\\" eve_ecs_runner/ --include=\\\"*.py\\\" | grep -v \\\"test\\\" | head -15\",\"description\":\"查找执行器中的 timeout 处理逻辑\"}",
+  "tool_input_preview": "{\"command\":\"cd eve-ecs-runner && python -m pytest tests/test_eve_result.py -v 2>&1\",\"description\":\"Run tests from within eve-ecs-runner directory\"}",
   "error": "Exit code 1\n(eval):cd:1: no such file or directory: eve-ecs-runner",
-  "timestamp": "2026-05-10T08:24:58.950Z",
+  "timestamp": "2026-05-10T09:40:10.436Z",
   "retry_count": 1
 }
