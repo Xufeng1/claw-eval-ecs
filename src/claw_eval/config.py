@@ -49,6 +49,7 @@ class ModelConfig(BaseModel):
     context_window: int = 262144
     temperature: float | None = 0.0  # None = don't send temperature param
     max_tokens: int = 16384
+    max_request_body_bytes: int = 7_500_000  # 0 = no body-size guard
 
 
 class JudgeConfig(BaseModel):

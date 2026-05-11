@@ -26,11 +26,6 @@ _ALWAYS_MEDIA_TOOLS = frozenset({"ReadMedia", "BrowserScreenshot"})
 # Tools that conditionally return frames (e.g. Read with image/PDF)
 _CONDITIONAL_MEDIA_TOOLS = frozenset({"Read"})
 
-# Maximum characters for a single tool result to prevent API body size overflow.
-# The matrixllm proxy enforces a 7,864,320-byte body limit; keeping individual
-# results under ~200 KB leaves headroom for the rest of the conversation.
-_MAX_TOOL_RESULT_CHARS = 200_000
-
 
 def _compress_image_b64(
     data_b64: str, max_dimension: int, quality: int = 60
@@ -233,15 +228,6 @@ class SandboxToolDispatcher:
         else:
             text_content = json.dumps(body, ensure_ascii=False)
 
-        # Guard against oversized tool results that would blow the API body limit
-        if len(text_content) > _MAX_TOOL_RESULT_CHARS:
-            text_content = (
-                text_content[:_MAX_TOOL_RESULT_CHARS]
-                + f"\n\n[WARNING: Tool result truncated from {len(text_content)} to "
-                f"{_MAX_TOOL_RESULT_CHARS} characters. "
-                f"Read the file in smaller chunks or use specific page ranges.]"
-            )
-
         result = ToolResultBlock(
             tool_use_id=tool_use.id,
             content=[TextBlock(text=text_content)],
@@ -290,13 +276,6 @@ class SandboxToolDispatcher:
             body = handler(tool_use.input)
             latency_ms = (time.monotonic() - t0) * 1000
             content_text = json.dumps(body, ensure_ascii=False) if isinstance(body, dict) else str(body)
-            if len(content_text) > _MAX_TOOL_RESULT_CHARS:
-                content_text = (
-                    content_text[:_MAX_TOOL_RESULT_CHARS]
-                    + f"\n\n[WARNING: Tool result truncated from {len(content_text)} to "
-                    f"{_MAX_TOOL_RESULT_CHARS} characters. "
-                    f"Read the file in smaller chunks or use specific page ranges.]"
-                )
             result = ToolResultBlock(
                 tool_use_id=tool_use.id,
                 content=[TextBlock(text=content_text)],

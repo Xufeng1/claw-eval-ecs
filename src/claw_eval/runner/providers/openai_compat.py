@@ -20,6 +20,11 @@ from ...models.tool import ToolSpec
 from ...models.trace import TokenUsage
 
 
+class RequestBodyTooLarge(Exception):
+    """Raised when the API rejects the request due to body size limit."""
+    pass
+
+
 def _build_keepalive_http_client() -> httpx.Client:
     """Build an httpx Client with TCP keepalive enabled."""
     socket_options = [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
@@ -335,6 +340,11 @@ class OpenAICompatProvider:
                 status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
                 exc_str = str(exc).lower()
                 exc_type = type(exc).__name__.lower()
+
+                # Detect body-size errors so the caller can truncate and retry
+                if status == 400 and ("body" in exc_str and ("length" in exc_str or "size" in exc_str or "exceed" in exc_str)):
+                    raise RequestBodyTooLarge(str(exc)) from exc
+
                 retryable = (
                         status in (429, 500, 502, 503, 529)
                         or "timeout" in exc_str
