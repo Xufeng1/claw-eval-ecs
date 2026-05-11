@@ -13,12 +13,12 @@
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   LOG_LEVEL = DEBUG
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   MEMORY_PRESSURE_WATCH = /sys/fs/cgroup/system.slice/aliyun.service/memory.pressure
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   MEMORY_PRESSURE_WRITE = c29tZSAyMDAwMDAgMjAwMDAwMAA=
-2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   OPENROUTER_API_KEY = sk-2baa86141af54f8cb545e64de0bf9f83
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   OPENROUTER_API_KEY = sk-xxxx
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PATH = /root/ossutil-2.1.2-linux-amd64:/mnt/data/workspace/claw-eval-ecs/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PS1 = (claw-eval-ecs) # 
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PWD = /mnt/data/workspace/claw-eval-ecs
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   PYTHONUNBUFFERED = 1
-2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   SERP_DEV_KEY = 6bb74ce7b9b9f4c66a8632d42ec33ddf
+2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   SERP_DEV_KEY = xxxx
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   SYSTEMD_EXEC_PID = 2048
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   TERM = vt220
 2026-05-10 19:58:37,188 [DEBUG] eve_ecs_runner.main:   USER = root
