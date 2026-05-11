@@ -81,7 +81,7 @@ def list_feeds(req: ListFeedsRequest | None = None) -> dict[str, Any]:
     for a in _articles:
         src = a["source"]
         cat = a["category"]
-        if req.category and cat != req.category:
+        if req.category and cat.lower() != req.category.lower():
             continue
         if src not in feeds:
             feeds[src] = {"source": src, "categories": set(), "article_count": 0}
@@ -131,9 +131,9 @@ def list_articles(req: ListArticlesRequest | None = None) -> dict[str, Any]:
         req = ListArticlesRequest()
     results = []
     for a in _articles:
-        if req.source and a["source"] != req.source:
+        if req.source and a["source"].lower() != req.source.lower():
             continue
-        if req.category and a["category"] != req.category:
+        if req.category and a["category"].lower() != req.category.lower():
             continue
         results.append({
             "article_id": a["article_id"],

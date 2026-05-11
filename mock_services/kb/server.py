@@ -86,7 +86,7 @@ def search_articles(req: SearchRequest) -> dict[str, Any]:
     results = []
     query_tokens = _tokenize_chinese(req.query)
     for article in _articles:
-        if req.category and article["category"] != req.category:
+        if req.category and article["category"].lower() != req.category.lower():
             continue
         # Chinese-aware keyword matching in title, tags, and content
         searchable = (

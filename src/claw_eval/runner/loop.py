@@ -60,6 +60,33 @@ def _make_local_tool_result(tool_use, text: str, is_error: bool = False) -> Tool
     )
 
 
+_MAX_TOOL_RESULT_CHARS = 200_000
+
+
+def _truncate_oversized_tool_results(messages: list[Message]) -> int:
+    """Truncate any tool result text blocks exceeding _MAX_TOOL_RESULT_CHARS.
+
+    Returns the number of blocks truncated.  This is a safety net against
+    oversized payloads that would hit the API body-size limit.
+    """
+    truncated = 0
+    for msg in messages:
+        if msg.role != "user":
+            continue
+        for block in msg.content:
+            if not isinstance(block, ToolResultBlock):
+                continue
+            for i, inner in enumerate(block.content):
+                if isinstance(inner, TextBlock) and len(inner.text) > _MAX_TOOL_RESULT_CHARS:
+                    block.content[i] = TextBlock(
+                        text=inner.text[:_MAX_TOOL_RESULT_CHARS]
+                        + f"\n\n[WARNING: Tool result truncated from {len(inner.text)} to "
+                        f"{_MAX_TOOL_RESULT_CHARS} characters.]"
+                    )
+                    truncated += 1
+    return truncated
+
+
 def _cap_conversation_images(messages: list[Message], max_images: int) -> int:
     """Drop earliest image blocks in-place when total exceeds *max_images*.
 
@@ -396,6 +423,11 @@ def run_task(
                 n_dropped = _cap_conversation_images(messages, _mcfg.max_conversation_images)
                 if n_dropped > 0:
                     _log(f"  [image-cap] dropped {n_dropped} oldest image(s), keeping last {_mcfg.max_conversation_images}")
+
+                # Safety net: truncate any oversized tool results before API call
+                n_trunc = _truncate_oversized_tool_results(messages)
+                if n_trunc > 0:
+                    _log(f"  [body-guard] truncated {n_trunc} oversized tool result(s) to {_MAX_TOOL_RESULT_CHARS} chars")
 
                 # Call model
                 _log(f"[turn {turn_count + 1}/{task.environment.max_turns}] calling model ...")

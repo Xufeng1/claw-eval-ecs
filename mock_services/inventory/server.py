@@ -68,7 +68,7 @@ def list_products(req: ListProductsRequest | None = None) -> dict[str, Any]:
         req = ListProductsRequest()
     results = []
     for p in _products:
-        if req.category and p["category"] != req.category:
+        if req.category and p["category"].lower() != req.category.lower():
             continue
         results.append(copy.deepcopy(p))
     resp = {"products": results, "total": len(results)}

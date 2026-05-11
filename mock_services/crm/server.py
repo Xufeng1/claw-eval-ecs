@@ -76,11 +76,11 @@ def list_customers(req: ListCustomersRequest | None = None) -> dict[str, Any]:
         req = ListCustomersRequest()
     results = []
     for c in _customers:
-        if req.status and c["status"] != req.status:
+        if req.status and c["status"].lower() != req.status.lower():
             continue
-        if req.tier and c["tier"] != req.tier:
+        if req.tier and c["tier"].lower() != req.tier.lower():
             continue
-        if req.industry and c["industry"] != req.industry:
+        if req.industry and c["industry"].lower() != req.industry.lower():
             continue
         results.append({
             "customer_id": c["customer_id"],

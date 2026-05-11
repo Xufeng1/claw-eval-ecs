@@ -75,7 +75,7 @@ def list_tickets(req: ListTicketsRequest | None = None) -> dict[str, Any]:
         req = ListTicketsRequest()
     results = []
     for t in _tickets:
-        if req.status == "all" or t["status"] == req.status:
+        if req.status == "all" or t["status"].lower() == req.status.lower():
             results.append({
                 "ticket_id": t["ticket_id"],
                 "title": t["title"],
