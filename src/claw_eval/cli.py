@@ -69,6 +69,7 @@ def _make_judge(cfg, args):
         model_id=model_id,
         api_key=api_key,
         base_url=cfg.judge.base_url,
+        max_tokens=cfg.judge.max_tokens,
     )
 
 
@@ -126,6 +127,7 @@ def _make_user_agent(cfg, task):
         model_id=ua_model_cfg.model_id,
         api_key=api_key,
         base_url=ua_model_cfg.base_url,
+        max_tokens=ua_model_cfg.max_tokens,
     )
 
 
@@ -358,6 +360,7 @@ def cmd_run(args: argparse.Namespace) -> None:
             extra_body=cfg.model.extra_body,
             temperature=cfg.model.temperature,
             reasoning_effort=cfg.model.reasoning_effort,
+            max_tokens=cfg.model.max_tokens,
         )
         judge = _make_judge(cfg, args)
         trials = args.trials or 1
@@ -483,6 +486,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         extra_body=cfg.model.extra_body,
         temperature=cfg.model.temperature,
         reasoning_effort=cfg.model.reasoning_effort,
+        max_tokens=cfg.model.max_tokens,
     )
 
     judge = _make_judge(cfg, args)
@@ -600,6 +604,7 @@ def cmd_run_inner(args: argparse.Namespace) -> None:
         extra_body=cfg.model.extra_body,
         temperature=cfg.model.temperature,
         reasoning_effort=cfg.model.reasoning_effort,
+        max_tokens=cfg.model.max_tokens,
     )
 
     sandbox_tools = getattr(args, "sandbox_tools", False)
@@ -814,6 +819,7 @@ def _run_single_task(
         extra_body=cfg.model.extra_body,
         temperature=cfg.model.temperature,
         reasoning_effort=cfg.model.reasoning_effort,
+        max_tokens=cfg.model.max_tokens,
     )
 
     # Build judge if needed
@@ -824,6 +830,7 @@ def _run_single_task(
             model_id=judge_model or cfg.judge.model_id,
             api_key=cfg.judge.api_key,
             base_url=cfg.judge.base_url,
+            max_tokens=cfg.judge.max_tokens,
         )
 
     # Resolve sandbox mode

@@ -208,11 +208,13 @@ class OpenAICompatProvider:
             extra_body: dict | None = None,
             temperature: float | None = 0.0,
             reasoning_effort: str | None = None,
+            max_tokens: int | None = None,
     ) -> None:
         self.model_id = model_id
         self.extra_body = extra_body or {}
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
+        self.max_tokens = max_tokens
         resolved_key = api_key or os.environ.get("OPENAI_API_KEY") or "unused"
         self.client = OpenAI(
             api_key=resolved_key,
@@ -305,6 +307,8 @@ class OpenAICompatProvider:
             "model": self.model_id,
             "messages": oai_messages,
         }
+        if self.max_tokens is not None:
+            kwargs["max_tokens"] = self.max_tokens
         if self.temperature is not None:
             kwargs["temperature"] = self.temperature
         if self.extra_body:

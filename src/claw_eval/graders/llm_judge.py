@@ -63,9 +63,11 @@ class LLMJudge:
         model_id: str = "google/gemini-2.5-flash",
         api_key: str | None = None,
         base_url: str = "https://openrouter.ai/api/v1",
+        max_tokens: int = 8192,
     ) -> None:
         self.client = OpenAI(api_key=api_key or "dummy", base_url=base_url)
         self.model_id = model_id
+        self.max_tokens = max_tokens
         self._call_log: list[dict] = []
 
     def evaluate(
@@ -93,7 +95,7 @@ class LLMJudge:
                         {"role": "user", "content": user_msg},
                     ],
                     temperature=0.0,
-                    max_tokens=8192,
+                    max_tokens=self.max_tokens,
                 )
                 raw = resp.choices[0].message.content or "{}"
                 # Strip markdown code fences if present
@@ -163,7 +165,7 @@ class LLMJudge:
                         {"role": "user", "content": user_msg},
                     ],
                     temperature=0.0,
-                    max_tokens=8192,
+                    max_tokens=self.max_tokens,
                 )
                 raw = resp.choices[0].message.content or "{}"
                 raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
@@ -265,7 +267,7 @@ class LLMJudge:
                         {"role": "user", "content": content_parts},
                     ],
                     temperature=0.0,
-                    max_tokens=8192,
+                    max_tokens=self.max_tokens,
                 )
                 raw = resp.choices[0].message.content or "{}"
                 raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
