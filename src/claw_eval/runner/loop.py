@@ -161,6 +161,65 @@ def _emergency_truncate(messages: list[Message]) -> None:
     )
 
 
+def _shrink_to_token_budget(
+    messages: list[Message],
+    context_window: int,
+    max_output_tokens: int,
+) -> int:
+    """Truncate the largest tool-result text blocks to fit the model's context window.
+
+    Dynamically adapts to the configured context_window: models with large
+    windows are unaffected; models with smaller windows get tool results
+    truncated to fit.  Reserves space for model output and a small buffer.
+
+    Returns the number of blocks truncated.
+    """
+    if context_window <= 0:
+        return 0
+
+    max_input_tokens = context_window - max_output_tokens - 2000
+
+    truncated = 0
+    for _ in range(20):  # safety bound
+        estimated = _estimate_tokens(messages)
+        if estimated <= max_input_tokens:
+            break
+
+        overflow_tokens = estimated - max_input_tokens
+        overflow_chars = overflow_tokens * 4  # inverse of chars/4 estimate
+
+        largest_ref: tuple[ToolResultBlock, int, int] | None = None
+        for msg in messages:
+            if msg.role != "user":
+                continue
+            for block in msg.content:
+                if not isinstance(block, ToolResultBlock):
+                    continue
+                for i, inner in enumerate(block.content):
+                    if isinstance(inner, TextBlock):
+                        cur_len = len(inner.text)
+                        if largest_ref is None or cur_len > largest_ref[2]:
+                            largest_ref = (block, i, cur_len)
+
+        if largest_ref is None:
+            break
+
+        parent_block, idx, orig_len = largest_ref
+        target_len = max(2000, orig_len - overflow_chars - 4096)
+        if target_len >= orig_len:
+            break
+
+        parent_block.content[idx] = TextBlock(
+            text=parent_block.content[idx].text[:target_len]
+            + f"\n\n[Content truncated from {orig_len} to {target_len} characters "
+            f"to fit context window ({context_window} tokens). "
+            f"Read the file in smaller chunks or use specific page ranges.]"
+        )
+        truncated += 1
+
+    return truncated
+
+
 def _cap_conversation_images(messages: list[Message], max_images: int) -> int:
     """Drop earliest image blocks in-place when total exceeds *max_images*.
 
@@ -505,16 +564,29 @@ def run_task(
                     if n_trunc > 0:
                         _log(f"  [body-guard] truncated {n_trunc} tool result(s) to fit under {_max_body} byte body limit")
 
-                # Call model (with retry on body-too-large)
+                # Token-budget guard: shrink if estimated tokens exceed context window
+                _max_out = model_cfg.max_tokens if model_cfg else 16384
+                n_token_trunc = _shrink_to_token_budget(messages, context_window, _max_out)
+                if n_token_trunc > 0:
+                    _log(f"  [token-guard] truncated {n_token_trunc} tool result(s) to fit context window ({context_window} tokens)")
+
+                # Call model (with retry on body-too-large / token-overflow)
                 _log(f"[turn {turn_count + 1}/{task.environment.max_turns}] calling model ...")
                 model_t0 = time.monotonic()
                 try:
                     response, usage = provider.chat(messages, tools=task_tools)
                 except _RequestBodyTooLarge:
-                    # Emergency: API rejected body despite pre-check; halve the largest block
-                    _log("  [body-guard] API rejected body size, emergency truncation and retry")
+                    # Emergency: API rejected despite pre-checks; aggressive truncation and retry
+                    _log("  [token-guard] API rejected request, emergency truncation and retry")
                     _emergency_truncate(messages)
-                    response, usage = provider.chat(messages, tools=task_tools)
+                    _shrink_to_token_budget(messages, context_window, _max_out)
+                    try:
+                        response, usage = provider.chat(messages, tools=task_tools)
+                    except _RequestBodyTooLarge:
+                        _log("  [token-guard] second rejection, aggressive halving")
+                        _emergency_truncate(messages)
+                        _emergency_truncate(messages)
+                        response, usage = provider.chat(messages, tools=task_tools)
                 model_time_s += time.monotonic() - model_t0
                 total_usage.input_tokens += usage.input_tokens
                 total_usage.output_tokens += usage.output_tokens

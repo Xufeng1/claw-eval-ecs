@@ -341,8 +341,13 @@ class OpenAICompatProvider:
                 exc_str = str(exc).lower()
                 exc_type = type(exc).__name__.lower()
 
-                # Detect body-size errors so the caller can truncate and retry
-                if status == 400 and ("body" in exc_str and ("length" in exc_str or "size" in exc_str or "exceed" in exc_str)):
+                # Detect body-size / token-overflow errors so the caller can truncate and retry
+                if status == 400 and (
+                    ("body" in exc_str and ("length" in exc_str or "size" in exc_str or "exceed" in exc_str))
+                    or "too long" in exc_str
+                    or "context_length_exceeded" in exc_str
+                    or ("token" in exc_str and ("exceed" in exc_str or "maximum" in exc_str or "limit" in exc_str))
+                ):
                     raise RequestBodyTooLarge(str(exc)) from exc
 
                 retryable = (
