@@ -16,8 +16,8 @@ traces_*/
 CLAUDE.md
 *.sh
 
-tasks/*/fixtures/*.mp4
-tasks/*/fixtures/*.webm
+# tasks/*/fixtures/*.mp4
+# tasks/*/fixtures/*.webm
 
 logs/
 
