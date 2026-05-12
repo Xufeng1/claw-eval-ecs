@@ -21,7 +21,7 @@ CLAUDE.md
 
 logs/
 
-docs/
+# docs/
 
 # Configs (contain API keys and internal endpoints)
 configs/
