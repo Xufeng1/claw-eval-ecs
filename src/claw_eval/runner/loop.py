@@ -454,6 +454,8 @@ def run_task(
     wall_start = time.monotonic()
     model_time_s = 0.0
     tool_time_s = 0.0
+    empty_response_retries = 0
+    max_empty_retries = 3
 
     # User agent state
     user_agent_rounds = 0
@@ -610,6 +612,18 @@ def run_task(
                     _log(f"  text: {text_preview}{'...' if len(text_blocks[0].text) > 120 else ''}")
 
                 if not tool_uses:
+                    # Detect empty/whitespace-only responses from thinking models.
+                    # These consume thinking tokens but produce no actionable output;
+                    # treating them as "task done" causes premature termination.
+                    text_content = "".join(b.text for b in text_blocks).strip()
+                    if not text_content and empty_response_retries < max_empty_retries:
+                        empty_response_retries += 1
+                        _log(f"[empty-response] whitespace-only reply (retry {empty_response_retries}/{max_empty_retries}), prompting model to continue")
+                        nudge = Message(role="user", content=[TextBlock(text="Please continue with the task. Use the available tools to make progress.")])
+                        messages.append(nudge)
+                        writer.write_event(TraceMessage(trace_id=trace_id, message=nudge))
+                        continue
+
                     if ua_enabled and user_agent_rounds < ua_max_rounds:
                         ua_text = user_agent.generate_response(
                             persona=ua_cfg.persona,

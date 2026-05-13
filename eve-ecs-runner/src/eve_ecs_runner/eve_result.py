@@ -41,11 +41,11 @@ class JudgeDetail:
     """Must be `True` for multi-turn datasets."""
     group_score: float | None = None
     """Per-sample score under pass@k (omit for non-pass@k benchmarks)."""
-    llm_judgement: str | list[str] | None = None
+    llm_judgement: str | list[str] | None = "-"
     """Raw LLM-judge output. Empty string indicates a judge failure.
     `None` or absent → EVE will not track judge success rate.
     """
-    processed_llm_judgement: str | list[str] | None = None
+    processed_llm_judgement: str | list[str] | None = "-"
     """Post-processed LLM-judge output (same semantics as above)."""
     ext_info: dict = field(default_factory=dict)
     """Arbitrary extra information displayed in the EVE UI."""

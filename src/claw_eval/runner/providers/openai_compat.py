@@ -214,6 +214,7 @@ class OpenAICompatProvider:
             temperature: float | None = 0.0,
             reasoning_effort: str | None = None,
             max_tokens: int | None = None,
+            request_timeout: float | None = None,
     ) -> None:
         self.model_id = model_id
         self.extra_body = extra_body or {}
@@ -221,9 +222,21 @@ class OpenAICompatProvider:
         self.reasoning_effort = reasoning_effort
         self.max_tokens = max_tokens
         resolved_key = api_key or os.environ.get("OPENAI_API_KEY") or "unused"
+
+        # Thinking models (effort/thinking in extra_body) need longer timeouts;
+        # default SDK timeout (600s) is too short for xhigh thinking.
+        has_thinking = bool(
+            self.extra_body.get("thinking")
+            or self.extra_body.get("effort")
+            or self.reasoning_effort
+        )
+        timeout = request_timeout or (1800.0 if has_thinking else 600.0)
+        self.default_stream = has_thinking
+
         self.client = OpenAI(
             api_key=resolved_key,
             base_url=base_url,
+            timeout=timeout,
             http_client=_build_keepalive_http_client(),
         )
 
@@ -325,13 +338,13 @@ class OpenAICompatProvider:
 
         max_retries = 5
         last_exc: Exception | None = None
-        use_stream = False  # default: non-streaming
+        use_stream = self.default_stream
         for attempt in range(max_retries + 1):
             try:
-                if attempt <= 1:
-                    response = self._call_without_stream(kwargs)
-                else:
+                if use_stream:
                     response = self._call_with_stream(kwargs)
+                else:
+                    response = self._call_without_stream(kwargs)
                 # Parse inside try so that empty-choices errors are retried
                 return self._parse_response(response)
             except Exception as exc:

@@ -24,4 +24,4 @@ user_agent_model:
 defaults:
   trace_dir: traces
   tasks_dir: tasks
-  timeout_seconds: 900
+  timeout_seconds: 1800
