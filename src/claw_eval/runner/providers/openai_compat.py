@@ -7,8 +7,6 @@ import os
 import random
 import re
 import time
-import socket
-import httpx
 from uuid import uuid4
 from typing import Any
 
@@ -18,27 +16,6 @@ from ...models.content import AudioBlock, ImageBlock, TextBlock, ToolUseBlock, V
 from ...models.message import Message
 from ...models.tool import ToolSpec
 from ...models.trace import TokenUsage
-
-
-class RequestBodyTooLarge(Exception):
-    """Raised when the API rejects the request due to body size limit."""
-    pass
-
-
-def _build_keepalive_http_client() -> httpx.Client:
-    """Build an httpx Client with TCP keepalive enabled."""
-    socket_options = [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
-    if hasattr(socket, "TCP_KEEPALIVE"):  # macOS
-        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, 30))
-    if hasattr(socket, "TCP_KEEPIDLE"):  # Linux
-        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60))
-    if hasattr(socket, "TCP_KEEPINTVL"):
-        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10))
-    if hasattr(socket, "TCP_KEEPCNT"):
-        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3))
-
-    transport = httpx.HTTPTransport(socket_options=socket_options)
-    return httpx.Client(transport=transport)
 
 
 def _tool_spec_to_openai(spec: ToolSpec) -> dict[str, Any]:
@@ -102,7 +79,7 @@ def _coerce_param_value(raw: str) -> Any:
             return value
 
     if (value.startswith("{") and value.endswith("}")) or (
-            value.startswith("[") and value.endswith("]")
+        value.startswith("[") and value.endswith("]")
     ):
         try:
             return json.loads(value)
@@ -202,108 +179,85 @@ def _blocks_to_openai_content(msg: Message) -> str | list[dict[str, Any]]:
     return parts
 
 
+def _message_to_openai(msg: Message) -> dict[str, Any] | list[dict[str, Any]]:
+    """Convert our Message to OpenAI chat format.
+
+    Returns a single dict for simple messages, or a list of dicts
+    when tool_result blocks need to be sent as separate tool messages.
+    """
+    # Tool result messages need special handling
+    tool_results = [b for b in msg.content if b.type == "tool_result"]
+    if tool_results:
+        results = []
+        for tr in tool_results:
+            content_text = "\n".join(t.text for t in tr.content) if tr.content else ""
+            results.append({
+                "role": "tool",
+                "tool_call_id": tr.tool_use_id,
+                "content": content_text,
+            })
+        return results
+
+    # Assistant messages with tool_use blocks
+    tool_uses = [b for b in msg.content if b.type == "tool_use"]
+    if tool_uses:
+        d = {
+            "role": "assistant",
+            "content": _blocks_to_openai_content(msg) or None,
+            "tool_calls": [
+                {
+                    "id": tu.id,
+                    "type": "function",
+                    "function": {
+                        "name": tu.name,
+                        "arguments": json.dumps(tu.input),
+                    },
+                }
+                for tu in tool_uses
+            ],
+        }
+        if msg.reasoning_content:
+            # Use "reasoning" for OpenRouter compatibility (also accepted as
+            # "reasoning_content" by native DeepSeek/QwQ endpoints).
+            d["reasoning"] = msg.reasoning_content
+        return d
+
+    # Simple text message
+    d = {
+        "role": msg.role,
+        "content": _blocks_to_openai_content(msg),
+    }
+    if msg.reasoning_content:
+        d["reasoning"] = msg.reasoning_content
+    return d
+
+
 class OpenAICompatProvider:
     """Calls any OpenAI-compatible chat completions endpoint."""
 
     def __init__(
-            self,
-            model_id: str = "gpt-4o",
-            api_key: str | None = None,
-            base_url: str | None = None,
-            extra_body: dict | None = None,
-            temperature: float | None = 0.0,
-            reasoning_effort: str | None = None,
-            max_tokens: int | None = None,
-            request_timeout: float | None = None,
+        self,
+        model_id: str = "gpt-4o",
+        api_key: str | None = None,
+        base_url: str | None = None,
+        extra_body: dict | None = None,
+        temperature: float | None = 0.0,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.model_id = model_id
         self.extra_body = extra_body or {}
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
-        self.max_tokens = max_tokens
         resolved_key = api_key or os.environ.get("OPENAI_API_KEY") or "unused"
-
-        # Thinking models (effort/thinking in extra_body) need longer timeouts;
-        # default SDK timeout (600s) is too short for xhigh thinking.
-        has_thinking = bool(
-            self.extra_body.get("thinking")
-            or self.extra_body.get("effort")
-            or self.reasoning_effort
-        )
-        timeout = request_timeout or (1800.0 if has_thinking else 600.0)
-        self.default_stream = has_thinking
-
         self.client = OpenAI(
             api_key=resolved_key,
             base_url=base_url,
-            timeout=timeout,
-            http_client=_build_keepalive_http_client(),
         )
 
-    def _message_to_openai(self, msg: Message) -> dict[str, Any] | list[dict[str, Any]]:
-        """Convert our Message to OpenAI chat format.
-
-        Returns a single dict for simple messages, or a list of dicts
-        when tool_result blocks need to be sent as separate tool messages.
-        """
-        # Tool result messages need special handling
-        tool_results = [b for b in msg.content if b.type == "tool_result"]
-        if tool_results:
-            results = []
-            for tr in tool_results:
-                content_text = "\n".join(t.text for t in tr.content) if tr.content else ""
-                results.append({
-                    "role": "tool",
-                    "tool_call_id": tr.tool_use_id,
-                    "content": content_text,
-                })
-            return results
-
-        # Assistant messages with tool_use blocks
-        tool_uses = [b for b in msg.content if b.type == "tool_use"]
-        if tool_uses:
-            d = {
-                "role": "assistant",
-                "content": _blocks_to_openai_content(msg),
-                "tool_calls": [
-                    {
-                        "id": tu.id,
-                        "type": "function",
-                        "function": {
-                            "name": tu.name,
-                            "arguments": json.dumps(tu.input),
-                        },
-                    }
-                    for tu in tool_uses
-                ],
-            }
-
-            is_kimi_thinking = (
-                    any(s in self.model_id.lower() for s in ("kimi", "moonshot"))
-                    and self.extra_body.get("thinking", {}).get("type") != "disabled"
-            )
-
-            if msg.reasoning_content:
-                d["reasoning"] = msg.reasoning_content
-                if is_kimi_thinking:
-                    d["reasoning_content"] = msg.reasoning_content
-            elif is_kimi_thinking:
-                d["reasoning_content"] = ""
-            return d
-
-        # Simple text message
-        d = {
-            "role": msg.role,
-            "content": _blocks_to_openai_content(msg),
-        }
-        if msg.reasoning_content:
-            d["reasoning"] = msg.reasoning_content
-        return d
-
     def chat(
-            self,
-            messages: list[Message],
-            tools: list[ToolSpec] | None = None,
+        self,
+        messages: list[Message],
+        tools: list[ToolSpec] | None = None,
     ) -> tuple[Message, TokenUsage]:
         """Send messages to the model and return parsed response."""
         has_multimodal_input = any(
@@ -315,7 +269,7 @@ class OpenAICompatProvider:
         # Build OpenAI messages list
         oai_messages: list[dict[str, Any]] = []
         for msg in messages:
-            converted = self._message_to_openai(msg)
+            converted = _message_to_openai(msg)
             if isinstance(converted, list):
                 oai_messages.extend(converted)
             else:
@@ -325,8 +279,6 @@ class OpenAICompatProvider:
             "model": self.model_id,
             "messages": oai_messages,
         }
-        if self.max_tokens is not None:
-            kwargs["max_tokens"] = self.max_tokens
         if self.temperature is not None:
             kwargs["temperature"] = self.temperature
         if self.extra_body:
@@ -336,15 +288,15 @@ class OpenAICompatProvider:
         if tools:
             kwargs["tools"] = [_tool_spec_to_openai(t) for t in tools]
 
-        max_retries = 5
+        max_retries = 20
         last_exc: Exception | None = None
-        use_stream = self.default_stream
+        use_stream = False  # default
         for attempt in range(max_retries + 1):
             try:
-                if use_stream:
-                    response = self._call_with_stream(kwargs)
-                else:
+                if attempt <= 1 and not use_stream:
                     response = self._call_without_stream(kwargs)
+                else:
+                    response = self._call_with_stream(kwargs)
                 # Parse inside try so that empty-choices errors are retried
                 return self._parse_response(response)
             except Exception as exc:
@@ -353,39 +305,38 @@ class OpenAICompatProvider:
                 status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
                 exc_str = str(exc).lower()
                 exc_type = type(exc).__name__.lower()
-
-                # Detect body-size / token-overflow errors so the caller can truncate and retry
-                if status == 400 and (
-                    ("body" in exc_str and ("length" in exc_str or "size" in exc_str or "exceed" in exc_str))
-                    or "too long" in exc_str
-                    or "context_length_exceeded" in exc_str
-                    or ("token" in exc_str and ("exceed" in exc_str or "maximum" in exc_str or "limit" in exc_str))
-                ):
-                    raise RequestBodyTooLarge(str(exc)) from exc
-
                 retryable = (
-                        status in (429, 500, 502, 503, 529)
-                        or "timeout" in exc_str
-                        or "connection" in exc_str
-                        or "empty choices" in exc_str
-                        or "remoteprotocol" in exc_type
-                        or "remoteprotocol" in exc_str
-                        or "peer closed" in exc_str
-                        or "incomplete" in exc_str
-                        or "server disconnected" in exc_str
+                    status in (429, 500, 502, 503, 529)
+                    or "timeout" in exc_str
+                    or "timed out" in exc_str
+                    or "connection" in exc_str
+                    or "empty choices" in exc_str
+                    or "remoteprotocol" in exc_type
+                    or "remoteprotocol" in exc_str
+                    or "peer closed" in exc_str
+                    or "incomplete" in exc_str
+                    or "server disconnected" in exc_str
+                    or "jsondecode" in exc_type
+                    or "provider returned error" in exc_str
+                    or "operation not allowed" in exc_str
                 )
                 if not retryable or attempt == max_retries:
                     if has_multimodal_input:
                         raise RuntimeError(
-                            "Model endpoint rejected multimodal input. "
+                            f"Model endpoint rejected multimodal input "
+                            f"({type(exc).__name__}: {exc}). "
                             "Check provider support for image/audio/video message parts, "
                             "or set media.strict_mode=false to allow skips."
                         ) from exc
                     raise
-                # Non-streaming timeout → switch to streaming to keep connection alive
-                if not use_stream and ("timeout" in exc_str or "read timed out" in exc_str) and attempt >= 1:
+                # Non-streaming error → switch to streaming immediately
+                if not use_stream and (
+                    "timeout" in exc_str
+                    or "timed out" in exc_str
+                    or "jsondecode" in exc_type
+                ):
                     use_stream = True
-                    print(f"[retry] Switching to streaming mode after repeated timeouts")
+                    print(f"[retry] Switching to streaming mode after {type(exc).__name__}")
                 # Exponential backoff with jitter
                 delay = random.uniform(2, 4)
                 print(f"[retry] API error ({status or type(exc).__name__}), "
