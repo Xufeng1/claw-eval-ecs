@@ -108,18 +108,6 @@ def _render_skills(cfg: PromptConfig) -> str:
     return "\n".join(lines)
 
 
-def _render_information_gathering() -> str:
-    return "\n".join([
-        "## Information Gathering",
-        "When processing data from tools:",
-        "- Always retrieve the FULL details of each item before making decisions.",
-        "  For example: if you get a list of emails, read each email's full content before classifying.",
-        "  If you get a list of notes, fetch each relevant note before summarizing.",
-        "- Do not skip detail-retrieval steps even if the list view seems sufficient.",
-        "- After completing analysis, use any available sharing/submission tools to deliver results.",
-        "- Prefer thoroughness over efficiency — missing data leads to incomplete results.",
-    ])
-
 
 def _render_workspace_blocks(cfg: PromptConfig) -> str:
     fcfg = cfg.files
@@ -187,7 +175,6 @@ def build_system_prompt(
     blocks.append(_render_tool_definitions(task, extra_tools))
     if prompt_cfg.include_tool_schema:
         blocks.append(_render_tool_schemas(task, extra_tools))
-    blocks.append(_render_information_gathering())
     blocks.append(_render_behavior_rules(prompt_cfg))
     blocks.append(_render_skills(prompt_cfg))
     blocks.append(_render_workspace_blocks(prompt_cfg))
