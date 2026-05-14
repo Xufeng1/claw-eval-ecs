@@ -52,11 +52,9 @@ class UserAgent:
         model_id: str,
         api_key: str,
         base_url: str = "https://openrouter.ai/api/v1",
-        max_tokens: int = 65536,
     ) -> None:
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model_id = model_id
-        self.max_tokens = max_tokens
 
     def generate_response(
         self,
@@ -84,7 +82,6 @@ class UserAgent:
                         {"role": "user", "content": user_msg},
                     ],
                     temperature=0.7,
-                    max_tokens=self.max_tokens,
                 )
                 text = (resp.choices[0].message.content or "").strip()
                 if "[DONE]" in text:
