@@ -13,6 +13,7 @@ claw-eval 评测任务运行状态检查脚本
 """
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -29,6 +30,52 @@ CONFIG_FILE = WORK_DIR / "config.yaml"
 
 SEPARATOR = "=" * 80
 SUB_SEP = "-" * 60
+PASS_THRESHOLD = 0.75
+
+
+def _pass_at_k(trial_scores: list[float], k: int = 1) -> float:
+    """Unbiased pass@k estimator: 1 - C(n-c, k) / C(n, k)."""
+    n = len(trial_scores)
+    if n == 0 or k > n:
+        return 0.0
+    c = sum(1 for s in trial_scores if s >= PASS_THRESHOLD)
+    denom = math.comb(n, k)
+    if denom == 0:
+        return 0.0
+    return 1.0 - math.comb(n - c, k) / denom
+
+
+def _pass_hat_k(trial_scores: list[float], k: int = 1) -> float:
+    """Simple pass^k estimator: (c/n)^k."""
+    n = len(trial_scores)
+    if n == 0:
+        return 0.0
+    c = sum(1 for s in trial_scores if s >= PASS_THRESHOLD)
+    return (c / n) ** k
+
+
+def extract_trial_scores_from_jsonl(jsonl_path: Path) -> dict | None:
+    """Extract task_id and task_score from the last grading_result in a JSONL file."""
+    result = None
+    try:
+        with open(jsonl_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if ev.get("type") == "grading_result":
+                    result = {
+                        "task_id": ev.get("task_id", ""),
+                        "task_score": ev.get("task_score", 0.0),
+                        "passed": ev.get("passed", False),
+                    }
+    except Exception:
+        pass
+    return result
 
 
 def load_yaml_simple(path: Path) -> dict:
@@ -217,6 +264,7 @@ def analyze_traces(trace_dir: Path, log_info: dict | None = None) -> dict:
     result = {
         "batch_results": [],
         "trace_files": {},  # task_id -> [files]
+        "trace_scores": {},  # task_id -> [task_score, ...] (从 JSONL 提取)
         "all_tasks": [],    # 从 tasks/ 目录获取
         "trace_errors": [], # trace 文件中的异常
     }
@@ -244,6 +292,15 @@ def analyze_traces(trace_dir: Path, log_info: dict | None = None) -> dict:
             "size": fp.stat().st_size,
             "mtime": fp.stat().st_mtime,
         })
+
+    # 从 trace JSONL 中提取 grading_result 里的 task_score
+    for fp in sorted(trace_dir.glob("*.jsonl")):
+        extracted = extract_trial_scores_from_jsonl(fp)
+        if extracted and extracted["task_id"]:
+            tid = extracted["task_id"]
+            if tid not in result["trace_scores"]:
+                result["trace_scores"][tid] = []
+            result["trace_scores"][tid].append(extracted["task_score"])
 
     # 读取 tasks 目录, 按启动时的 --tag / --filter / --range 过滤
     tasks_dir = WORK_DIR / "tasks"
@@ -555,11 +612,80 @@ def main():
     else:
         print("  (暂无已完成任务)")
 
-    # ── 6. 异常日志检索 ──
-    print(f"\n[6] 异常日志检索 (error / traceback)")
+    # ── 6. 整体聚合指标 (avg_score / pass@k / pass^k) ──
+    # 综合 batch_results 和 trace JSONL 中的评分数据
+    trace_scores = analysis["trace_scores"]
+
+    # 合并所有有评分数据的任务: 优先用 batch_results, 补充 trace JSONL 中尚未入 batch 的
+    all_scored_tasks: dict[str, list[float]] = {}
+    for t in batch_results:
+        tid = t["task_id"]
+        all_scored_tasks[tid] = [tr["task_score"] for tr in t["trials"]]
+
+    for tid, scores in trace_scores.items():
+        if tid not in all_scored_tasks and scores:
+            all_scored_tasks[tid] = scores
+
+    n_scored = len(all_scored_tasks)
+    print(f"\n[6] 整体聚合指标 ({n_scored} 个已评分任务, 含运行中已出分)")
     print(SUB_SEP)
 
-    # 6a. worker.log 中的 traceback
+    if all_scored_tasks:
+        # 每个任务的指标
+        task_avg_scores = []
+        task_pass_at_1 = []
+        task_pass_hat_k_vals = []
+        task_pass_at_k_vals = []
+
+        for tid in sorted(all_scored_tasks):
+            scores = all_scored_tasks[tid]
+            n = len(scores)
+            avg_s = sum(scores) / n if n else 0.0
+            p_at_1 = _pass_at_k(scores, k=1)
+            p_hat_k = _pass_hat_k(scores, k=n)
+            p_at_k = _pass_at_k(scores, k=n)
+
+            task_avg_scores.append(avg_s)
+            task_pass_at_1.append(p_at_1)
+            task_pass_hat_k_vals.append(p_hat_k)
+            task_pass_at_k_vals.append(p_at_k)
+
+        overall_avg_score = sum(task_avg_scores) / n_scored
+        overall_pass_at_1 = sum(task_pass_at_1) / n_scored
+        overall_pass_hat_k = sum(task_pass_hat_k_vals) / n_scored
+        overall_pass_at_k = sum(task_pass_at_k_vals) / n_scored
+
+        n_passed = sum(1 for s in task_avg_scores if s >= PASS_THRESHOLD)
+
+        print(f"  已评分任务数   : {n_scored} / {total_tasks}")
+        print(f"  trials/task    : {trials_needed}")
+        print()
+        print(f"  avg_score      : {overall_avg_score:.4f}")
+        print(f"  pass@1         : {overall_pass_at_1:.4f}")
+        print(f"  pass@{trials_needed}         : {overall_pass_at_k:.4f}")
+        print(f"  pass^{trials_needed} (hat)   : {overall_pass_hat_k:.4f}")
+        print(f"  avg_passed率   : {n_passed}/{n_scored} ({n_passed / n_scored * 100:.1f}%)")
+
+        # 如果有未评分的任务, 显示乐观/悲观区间
+        if isinstance(total_tasks, int) and n_scored < total_tasks:
+            remaining = total_tasks - n_scored
+            print(f"\n  --- 预估区间 (剩余 {remaining} 任务未评分) ---")
+            # 悲观: 未评分任务全部得 0
+            pessimistic_avg = sum(task_avg_scores) / total_tasks
+            pessimistic_pass_rate = n_passed / total_tasks
+            # 乐观: 未评分任务全部得满分
+            optimistic_avg = (sum(task_avg_scores) + remaining * 1.0) / total_tasks
+            optimistic_pass_rate = (n_passed + remaining) / total_tasks
+            print(f"  avg_score 区间 : [{pessimistic_avg:.4f}, {optimistic_avg:.4f}]")
+            print(f"  通过率区间     : [{pessimistic_pass_rate*100:.1f}%, {optimistic_pass_rate*100:.1f}%]")
+    else:
+        print("  (暂无评分数据)")
+
+    # ── 7. 异常日志检索 ──
+    print(f"\n[7] 异常日志检索 (error / traceback)")
+    print(SUB_SEP)
+
+    # 7a. worker.log 中的 traceback
     worker_tbs = log_info.get("tracebacks", [])
     if worker_tbs:
         print(f"\n  [worker.log] 发现 {len(worker_tbs)} 个 traceback:")
@@ -570,7 +696,7 @@ def main():
     else:
         print(f"\n  [worker.log] 无 traceback")
 
-    # 6b. trace 文件中的 error/traceback
+    # 7b. trace 文件中的 error/traceback
     trace_errors = analysis["trace_errors"]
     if trace_errors:
         print(f"\n  [trace files] 发现 {len(trace_errors)} 个异常样本 (最多10个):")
