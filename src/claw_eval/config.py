@@ -153,6 +153,7 @@ class UserAgentModelConfig(BaseModel):
 class Config(BaseModel):
     model: ModelConfig = ModelConfig()
     judge: JudgeConfig = JudgeConfig()
+    user_agent_model_judge: JudgeConfig = JudgeConfig()
     defaults: DefaultsConfig = DefaultsConfig()
     sandbox: SandboxConfig = SandboxConfig()
     prompt: PromptConfig = PromptConfig()

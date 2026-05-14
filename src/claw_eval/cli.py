@@ -52,23 +52,28 @@ def _make_trace_dir(base_dir: str | Path, model_id: str) -> Path:
     return trace_dir
 
 
-def _make_judge(cfg, args):
-    """Create an LLMJudge instance if enabled, or None."""
+def _make_judge(cfg, args, *, use_user_agent_judge=False):
+    """Create an LLMJudge instance if enabled, or None.
+
+    When *use_user_agent_judge* is True, prefer ``cfg.user_agent_model_judge``
+    over the general ``cfg.judge`` so that user-agent tasks can use a
+    separate judge model.
+    """
     if getattr(args, "no_judge", False):
         return None
-    if not cfg.judge.enabled:
+    judge_cfg = cfg.user_agent_model_judge if use_user_agent_judge else cfg.judge
+    if not judge_cfg.enabled:
         return None
-    # Need at least an API key to use the judge
-    api_key = cfg.judge.api_key
+    api_key = judge_cfg.api_key
     if not api_key:
         return None
     from .graders.llm_judge import LLMJudge
 
-    model_id = getattr(args, "judge_model", None) or cfg.judge.model_id
+    model_id = getattr(args, "judge_model", None) or judge_cfg.model_id
     return LLMJudge(
         model_id=model_id,
         api_key=api_key,
-        base_url=cfg.judge.base_url,
+        base_url=judge_cfg.base_url,
     )
 
 
@@ -359,7 +364,7 @@ def cmd_run(args: argparse.Namespace) -> None:
             temperature=cfg.model.temperature,
             reasoning_effort=cfg.model.reasoning_effort,
         )
-        judge = _make_judge(cfg, args)
+        judge = _make_judge(cfg, args, use_user_agent_judge=task.user_agent.enabled)
         trials = args.trials or 1
         trial_scores: list[float] = []
         trace_paths: list[Path] = []
@@ -485,7 +490,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         reasoning_effort=cfg.model.reasoning_effort,
     )
 
-    judge = _make_judge(cfg, args)
+    judge = _make_judge(cfg, args, use_user_agent_judge=task.user_agent.enabled)
     sandbox_tools = getattr(args, "sandbox_tools", False)
 
     from .runner.services import ServiceManager
@@ -625,7 +630,7 @@ def cmd_run_inner(args: argparse.Namespace) -> None:
     print(f"Trace: {trace_path}")
 
     # --- Inline grading ---
-    judge = _make_judge(cfg, args)
+    judge = _make_judge(cfg, args, use_user_agent_judge=task.user_agent.enabled)
     start, messages, dispatches, media_events, end, audit_data = load_trace(trace_path)
     grader = get_grader(task.task_id, tasks_dir=tasks_dir, task_dir=task_yaml.parent)
     scores, judge_calls = _grade_with_optional_params(
@@ -690,12 +695,12 @@ def cmd_grade(args: argparse.Namespace) -> None:
     from .trace.reader import load_trace
 
     cfg = load_config(args.config if hasattr(args, "config") else None)
-    judge = _make_judge(cfg, args)
 
     start, messages, dispatches, media_events, end, audit_data = load_trace(args.trace)
 
     task_yaml = _resolve_task_yaml(args.task)
     task = TaskDefinition.from_yaml(task_yaml)
+    judge = _make_judge(cfg, args, use_user_agent_judge=task.user_agent.enabled)
     tasks_dir = _resolve_tasks_dir(task_yaml)
 
     grader = get_grader(task.task_id, tasks_dir=tasks_dir, task_dir=task_yaml.parent)
@@ -818,12 +823,13 @@ def _run_single_task(
 
     # Build judge if needed
     judge = None
-    if not no_judge and cfg.judge.enabled and cfg.judge.api_key:
+    judge_cfg = cfg.user_agent_model_judge if task.user_agent.enabled else cfg.judge
+    if not no_judge and judge_cfg.enabled and judge_cfg.api_key:
         from .graders.llm_judge import LLMJudge
         judge = LLMJudge(
-            model_id=judge_model or cfg.judge.model_id,
-            api_key=cfg.judge.api_key,
-            base_url=cfg.judge.base_url,
+            model_id=judge_model or judge_cfg.model_id,
+            api_key=judge_cfg.api_key,
+            base_url=judge_cfg.base_url,
         )
 
     # Resolve sandbox mode
