@@ -69,7 +69,6 @@ def _make_judge(cfg, args):
         model_id=model_id,
         api_key=api_key,
         base_url=cfg.judge.base_url,
-        max_tokens=cfg.judge.max_tokens,
     )
 
 
@@ -127,7 +126,6 @@ def _make_user_agent(cfg, task):
         model_id=ua_model_cfg.model_id,
         api_key=api_key,
         base_url=ua_model_cfg.base_url,
-        max_tokens=ua_model_cfg.max_tokens,
     )
 
 
@@ -360,7 +358,6 @@ def cmd_run(args: argparse.Namespace) -> None:
             extra_body=cfg.model.extra_body,
             temperature=cfg.model.temperature,
             reasoning_effort=cfg.model.reasoning_effort,
-            max_tokens=cfg.model.max_tokens,
         )
         judge = _make_judge(cfg, args)
         trials = args.trials or 1
@@ -486,7 +483,6 @@ def cmd_run(args: argparse.Namespace) -> None:
         extra_body=cfg.model.extra_body,
         temperature=cfg.model.temperature,
         reasoning_effort=cfg.model.reasoning_effort,
-        max_tokens=cfg.model.max_tokens,
     )
 
     judge = _make_judge(cfg, args)
@@ -604,7 +600,6 @@ def cmd_run_inner(args: argparse.Namespace) -> None:
         extra_body=cfg.model.extra_body,
         temperature=cfg.model.temperature,
         reasoning_effort=cfg.model.reasoning_effort,
-        max_tokens=cfg.model.max_tokens,
     )
 
     sandbox_tools = getattr(args, "sandbox_tools", False)
@@ -819,7 +814,6 @@ def _run_single_task(
         extra_body=cfg.model.extra_body,
         temperature=cfg.model.temperature,
         reasoning_effort=cfg.model.reasoning_effort,
-        max_tokens=cfg.model.max_tokens,
     )
 
     # Build judge if needed
@@ -830,7 +824,6 @@ def _run_single_task(
             model_id=judge_model or cfg.judge.model_id,
             api_key=cfg.judge.api_key,
             base_url=cfg.judge.base_url,
-            max_tokens=cfg.judge.max_tokens,
         )
 
     # Resolve sandbox mode
@@ -1636,7 +1629,7 @@ def main(argv: list[str] | None = None) -> None:
     p_batch.add_argument("--filter", default=None, help="Only run tasks matching this substring (e.g. 'en_' or 'T01')")
     p_batch.add_argument("--tag", default=None, help="Only run tasks with this tag (e.g. 'multimodal', 'general')")
     p_batch.add_argument("--range", default=None, help="Only run tasks in numeric ID range (e.g. '1-104')")
-    p_batch.add_argument("--parallel", type=int, default=6, help="Number of parallel workers (default: 4)")
+    p_batch.add_argument("--parallel", type=int, default=4, help="Number of parallel workers (default: 4)")
     p_batch.add_argument("--model", default=None)
     p_batch.add_argument("--api-key", default=None)
     p_batch.add_argument("--base-url", default=None)
