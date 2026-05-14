@@ -35,7 +35,7 @@ from .compact import (
 )
 from .dispatcher import ToolDispatcher
 from .media_loader import collect_media_references, load_media_from_ref, model_supports_modality, to_content_block
-from .providers.openai_compat import OpenAICompatProvider, RequestBodyTooLarge as _RequestBodyTooLarge
+from .providers.openai_compat import OpenAICompatProvider
 from .system_prompt import build_system_prompt
 from .todo import TodoManager
 
@@ -58,166 +58,6 @@ def _make_local_tool_result(tool_use, text: str, is_error: bool = False) -> Tool
         content=[TextBlock(text=text)],
         is_error=is_error,
     )
-
-
-def _estimate_body_bytes(messages: list[Message]) -> int:
-    """Rough estimate of the JSON-serialized request body size in bytes.
-
-    Counts text characters (≈bytes for ASCII/JSON-escaped content) plus a
-    fixed overhead per image block.  Not exact, but close enough to decide
-    whether truncation is needed.
-    """
-    total = 0
-    for msg in messages:
-        for block in msg.content:
-            if isinstance(block, TextBlock):
-                total += len(block.text)
-            elif hasattr(block, "content"):
-                for inner in block.content:
-                    if isinstance(inner, TextBlock):
-                        total += len(inner.text)
-            if hasattr(block, "data"):
-                total += len(getattr(block, "data", ""))
-    return total
-
-
-def _shrink_to_fit(messages: list[Message], max_body_bytes: int) -> int:
-    """Iteratively truncate the largest tool-result text blocks until the
-    estimated body size fits under *max_body_bytes*.
-
-    Returns the number of blocks truncated.  Does nothing when
-    *max_body_bytes* <= 0.
-    """
-    if max_body_bytes <= 0:
-        return 0
-
-    truncated = 0
-    while True:
-        est = _estimate_body_bytes(messages)
-        if est <= max_body_bytes:
-            break
-
-        overflow = est - max_body_bytes
-        # Find the single largest tool-result text block
-        largest_ref: tuple[ToolResultBlock, int, int] | None = None  # (block, idx, length)
-        for msg in messages:
-            if msg.role != "user":
-                continue
-            for block in msg.content:
-                if not isinstance(block, ToolResultBlock):
-                    continue
-                for i, inner in enumerate(block.content):
-                    if isinstance(inner, TextBlock):
-                        cur_len = len(inner.text)
-                        if largest_ref is None or cur_len > largest_ref[2]:
-                            largest_ref = (block, i, cur_len)
-
-        if largest_ref is None:
-            break
-
-        parent_block, idx, orig_len = largest_ref
-        # Shrink this block to fit; keep at least 1000 chars for context
-        target_len = max(1000, orig_len - overflow - 1024)
-        if target_len >= orig_len:
-            break
-
-        parent_block.content[idx] = TextBlock(
-            text=parent_block.content[idx].text[:target_len]
-            + f"\n\n[WARNING: Tool result truncated from {orig_len} to "
-            f"{target_len} characters to fit API body size limit. "
-            f"Read the file in smaller chunks or use specific page ranges.]"
-        )
-        truncated += 1
-
-    return truncated
-
-
-def _emergency_truncate(messages: list[Message]) -> None:
-    """Halve the largest tool-result text block.
-
-    Called when the API rejects the body despite the pre-check, meaning
-    our size estimate was off.  Halving is aggressive enough to make
-    progress on the next retry.
-    """
-    largest: tuple[ToolResultBlock, int, int] | None = None
-    for msg in messages:
-        if msg.role != "user":
-            continue
-        for block in msg.content:
-            if not isinstance(block, ToolResultBlock):
-                continue
-            for i, inner in enumerate(block.content):
-                if isinstance(inner, TextBlock):
-                    if largest is None or len(inner.text) > largest[2]:
-                        largest = (block, i, len(inner.text))
-    if largest is None:
-        return
-    parent, idx, orig_len = largest
-    half = orig_len // 2
-    parent.content[idx] = TextBlock(
-        text=parent.content[idx].text[:half]
-        + f"\n\n[WARNING: Tool result truncated from {orig_len} to "
-        f"{half} characters after API body size rejection.]"
-    )
-
-
-def _shrink_to_token_budget(
-    messages: list[Message],
-    context_window: int,
-    max_output_tokens: int,
-) -> int:
-    """Truncate the largest tool-result text blocks to fit the model's context window.
-
-    Dynamically adapts to the configured context_window: models with large
-    windows are unaffected; models with smaller windows get tool results
-    truncated to fit.  Reserves space for model output and a small buffer.
-
-    Returns the number of blocks truncated.
-    """
-    if context_window <= 0:
-        return 0
-
-    max_input_tokens = context_window - max_output_tokens - 2000
-
-    truncated = 0
-    for _ in range(20):  # safety bound
-        estimated = _estimate_tokens(messages)
-        if estimated <= max_input_tokens:
-            break
-
-        overflow_tokens = estimated - max_input_tokens
-        overflow_chars = overflow_tokens * 4  # inverse of chars/4 estimate
-
-        largest_ref: tuple[ToolResultBlock, int, int] | None = None
-        for msg in messages:
-            if msg.role != "user":
-                continue
-            for block in msg.content:
-                if not isinstance(block, ToolResultBlock):
-                    continue
-                for i, inner in enumerate(block.content):
-                    if isinstance(inner, TextBlock):
-                        cur_len = len(inner.text)
-                        if largest_ref is None or cur_len > largest_ref[2]:
-                            largest_ref = (block, i, cur_len)
-
-        if largest_ref is None:
-            break
-
-        parent_block, idx, orig_len = largest_ref
-        target_len = max(2000, orig_len - overflow_chars - 4096)
-        if target_len >= orig_len:
-            break
-
-        parent_block.content[idx] = TextBlock(
-            text=parent_block.content[idx].text[:target_len]
-            + f"\n\n[Content truncated from {orig_len} to {target_len} characters "
-            f"to fit context window ({context_window} tokens). "
-            f"Read the file in smaller chunks or use specific page ranges.]"
-        )
-        truncated += 1
-
-    return truncated
 
 
 def _cap_conversation_images(messages: list[Message], max_images: int) -> int:
@@ -454,8 +294,6 @@ def run_task(
     wall_start = time.monotonic()
     model_time_s = 0.0
     tool_time_s = 0.0
-    empty_response_retries = 0
-    max_empty_retries = 3
 
     # User agent state
     user_agent_rounds = 0
@@ -559,36 +397,10 @@ def run_task(
                 if n_dropped > 0:
                     _log(f"  [image-cap] dropped {n_dropped} oldest image(s), keeping last {_mcfg.max_conversation_images}")
 
-                # Safety net: shrink largest tool results if body would exceed API limit
-                _max_body = model_cfg.max_request_body_bytes if model_cfg else 7_500_000
-                if _max_body > 0:
-                    n_trunc = _shrink_to_fit(messages, _max_body)
-                    if n_trunc > 0:
-                        _log(f"  [body-guard] truncated {n_trunc} tool result(s) to fit under {_max_body} byte body limit")
-
-                # Token-budget guard: shrink if estimated tokens exceed context window
-                _max_out = model_cfg.max_tokens if model_cfg else 16384
-                n_token_trunc = _shrink_to_token_budget(messages, context_window, _max_out)
-                if n_token_trunc > 0:
-                    _log(f"  [token-guard] truncated {n_token_trunc} tool result(s) to fit context window ({context_window} tokens)")
-
-                # Call model (with retry on body-too-large / token-overflow)
+                # Call model
                 _log(f"[turn {turn_count + 1}/{task.environment.max_turns}] calling model ...")
                 model_t0 = time.monotonic()
-                try:
-                    response, usage = provider.chat(messages, tools=task_tools)
-                except _RequestBodyTooLarge:
-                    # Emergency: API rejected despite pre-checks; aggressive truncation and retry
-                    _log("  [token-guard] API rejected request, emergency truncation and retry")
-                    _emergency_truncate(messages)
-                    _shrink_to_token_budget(messages, context_window, _max_out)
-                    try:
-                        response, usage = provider.chat(messages, tools=task_tools)
-                    except _RequestBodyTooLarge:
-                        _log("  [token-guard] second rejection, aggressive halving")
-                        _emergency_truncate(messages)
-                        _emergency_truncate(messages)
-                        response, usage = provider.chat(messages, tools=task_tools)
+                response, usage = provider.chat(messages, tools=task_tools)
                 model_time_s += time.monotonic() - model_t0
                 total_usage.input_tokens += usage.input_tokens
                 total_usage.output_tokens += usage.output_tokens
@@ -612,18 +424,6 @@ def run_task(
                     _log(f"  text: {text_preview}{'...' if len(text_blocks[0].text) > 120 else ''}")
 
                 if not tool_uses:
-                    # Detect empty/whitespace-only responses from thinking models.
-                    # These consume thinking tokens but produce no actionable output;
-                    # treating them as "task done" causes premature termination.
-                    text_content = "".join(b.text for b in text_blocks).strip()
-                    if not text_content and empty_response_retries < max_empty_retries:
-                        empty_response_retries += 1
-                        _log(f"[empty-response] whitespace-only reply (retry {empty_response_retries}/{max_empty_retries}), prompting model to continue")
-                        nudge = Message(role="user", content=[TextBlock(text="Please continue with the task. Use the available tools to make progress.")])
-                        messages.append(nudge)
-                        writer.write_event(TraceMessage(trace_id=trace_id, message=nudge))
-                        continue
-
                     if ua_enabled and user_agent_rounds < ua_max_rounds:
                         ua_text = user_agent.generate_response(
                             persona=ua_cfg.persona,
