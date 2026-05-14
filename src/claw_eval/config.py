@@ -48,8 +48,6 @@ class ModelConfig(BaseModel):
     reasoning_effort: str | None = None
     context_window: int = 262144
     temperature: float | None = 0.0  # None = don't send temperature param
-    max_tokens: int = 16384
-    max_request_body_bytes: int = 7_500_000  # 0 = no body-size guard
 
 
 class JudgeConfig(BaseModel):
@@ -57,7 +55,6 @@ class JudgeConfig(BaseModel):
     base_url: str = "https://openrouter.ai/api/v1"
     model_id: str = "google/gemini-3-flash-preview"
     enabled: bool = True
-    max_tokens: int = 8192
 
 
 class DefaultsConfig(BaseModel):
@@ -151,7 +148,6 @@ class UserAgentModelConfig(BaseModel):
     api_key: str | None = None
     base_url: str = "https://openrouter.ai/api/v1"
     model_id: str = "google/gemini-3-flash-preview"
-    max_tokens: int = 65536
 
 
 class Config(BaseModel):
