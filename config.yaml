@@ -10,19 +10,19 @@ model:
 judge:
   api_key: ${OPENROUTER_API_KEY}
   base_url: ${JUDGE_BASE_URL}
-  model_id: google/gemini-3-flash-preview
+  model_id: ${JUDGE_MODEL}
   enabled: true
 
 user_agent_model_judge:
   api_key: ${OPENROUTER_API_KEY}
   base_url: ${JUDGE_BASE_URL}
-  model_id: anthropic/claude-opus-4.6
+  model_id: ${USER_AGENT_MODEL}
   enabled: true
 
 user_agent_model:
   api_key: ${OPENROUTER_API_KEY}
   base_url: ${JUDGE_BASE_URL}
-  model_id: anthropic/claude-opus-4.6
+  model_id: ${USER_AGENT_MODEL}
 
 defaults:
   trace_dir: traces
