@@ -182,12 +182,15 @@ def _blocks_to_openai_content(msg: Message) -> str | list[dict[str, Any]]:
 def _message_to_openai(
     msg: Message,
     *,
-    include_reasoning: bool = False,
+    reasoning_key: str | None = None,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Convert our Message to OpenAI chat format.
 
     Returns a single dict for simple messages, or a list of dicts
     when tool_result blocks need to be sent as separate tool messages.
+
+    reasoning_key: if set, include reasoning_content under this key
+                   (e.g. "reasoning" for OpenRouter, "reasoning_content" for DeepSeek V4).
     """
     # Tool result messages need special handling
     tool_results = [b for b in msg.content if b.type == "tool_result"]
@@ -220,8 +223,8 @@ def _message_to_openai(
                 for tu in tool_uses
             ],
         }
-        if include_reasoning and msg.reasoning_content:
-            d["reasoning"] = msg.reasoning_content
+        if reasoning_key and msg.reasoning_content:
+            d[reasoning_key] = msg.reasoning_content
         return d
 
     # Simple text message
@@ -229,8 +232,8 @@ def _message_to_openai(
         "role": msg.role,
         "content": _blocks_to_openai_content(msg),
     }
-    if include_reasoning and msg.reasoning_content:
-        d["reasoning"] = msg.reasoning_content
+    if reasoning_key and msg.reasoning_content:
+        d[reasoning_key] = msg.reasoning_content
     return d
 
 
@@ -268,14 +271,18 @@ class OpenAICompatProvider:
             for b in m.content
         )
 
-        # DeepSeek V4 API rejects reasoning_content in input messages with 400
-        include_reasoning = "deepseek-v4" not in self.model_id.lower()
+        # DeepSeek V4 requires reasoning_content passed back under "reasoning_content" key;
+        # all other models use the original "reasoning" key.
+        if "deepseek-v4" in self.model_id.lower():
+            reasoning_key = "reasoning_content"
+        else:
+            reasoning_key = "reasoning"
 
         # Build OpenAI messages list
         oai_messages: list[dict[str, Any]] = []
         for msg in messages:
             converted = _message_to_openai(
-                msg, include_reasoning=include_reasoning,
+                msg, reasoning_key=reasoning_key,
             )
             if isinstance(converted, list):
                 oai_messages.extend(converted)
