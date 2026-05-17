@@ -179,7 +179,11 @@ def _blocks_to_openai_content(msg: Message) -> str | list[dict[str, Any]]:
     return parts
 
 
-def _message_to_openai(msg: Message) -> dict[str, Any] | list[dict[str, Any]]:
+def _message_to_openai(
+    msg: Message,
+    *,
+    include_reasoning: bool = False,
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Convert our Message to OpenAI chat format.
 
     Returns a single dict for simple messages, or a list of dicts
@@ -216,9 +220,7 @@ def _message_to_openai(msg: Message) -> dict[str, Any] | list[dict[str, Any]]:
                 for tu in tool_uses
             ],
         }
-        if msg.reasoning_content:
-            # Use "reasoning" for OpenRouter compatibility (also accepted as
-            # "reasoning_content" by native DeepSeek/QwQ endpoints).
+        if include_reasoning and msg.reasoning_content:
             d["reasoning"] = msg.reasoning_content
         return d
 
@@ -227,7 +229,7 @@ def _message_to_openai(msg: Message) -> dict[str, Any] | list[dict[str, Any]]:
         "role": msg.role,
         "content": _blocks_to_openai_content(msg),
     }
-    if msg.reasoning_content:
+    if include_reasoning and msg.reasoning_content:
         d["reasoning"] = msg.reasoning_content
     return d
 
@@ -266,10 +268,15 @@ class OpenAICompatProvider:
             for b in m.content
         )
 
+        # DeepSeek V4 API rejects reasoning_content in input messages with 400
+        include_reasoning = "deepseek-v4" not in self.model_id.lower()
+
         # Build OpenAI messages list
         oai_messages: list[dict[str, Any]] = []
         for msg in messages:
-            converted = _message_to_openai(msg)
+            converted = _message_to_openai(
+                msg, include_reasoning=include_reasoning,
+            )
             if isinstance(converted, list):
                 oai_messages.extend(converted)
             else:
