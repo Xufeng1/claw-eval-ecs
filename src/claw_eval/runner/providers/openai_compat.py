@@ -271,12 +271,17 @@ class OpenAICompatProvider:
             for b in m.content
         )
 
-        # DeepSeek V4 requires reasoning_content passed back under "reasoning_content" key;
-        # all other models use the original "reasoning" key.
-        if "deepseek-v4" in self.model_id.lower():
+        # Determine how to handle reasoning_content in input messages.
+        # Only models whose API *requires* reasoning passed back get a key;
+        # all others (Claude, GPT, GLM, etc.) do not accept it and would
+        # either error or bloat the prompt.
+        model_lower = self.model_id.lower()
+        if "deepseek-v4" in model_lower:
             reasoning_key = "reasoning_content"
-        else:
+        elif any(s in model_lower for s in ("deepseek-r1", "deepseek/deepseek-r", "qwq")):
             reasoning_key = "reasoning"
+        else:
+            reasoning_key = None
 
         # Build OpenAI messages list
         oai_messages: list[dict[str, Any]] = []
@@ -293,7 +298,12 @@ class OpenAICompatProvider:
             "model": self.model_id,
             "messages": oai_messages,
         }
-        if self.temperature is not None:
+        # Claude thinking models (opus-4.7+) reject temperature parameter
+        is_claude_thinking = any(
+            s in model_lower
+            for s in ("claude-opus-4-7", "claude-opus-4.7", "claude-opus-4-8", "claude-opus-4.8")
+        )
+        if self.temperature is not None and not is_claude_thinking:
             kwargs["temperature"] = self.temperature
         if self.extra_body:
             kwargs["extra_body"] = dict(self.extra_body)
