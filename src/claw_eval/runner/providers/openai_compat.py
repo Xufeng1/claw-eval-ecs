@@ -6,16 +6,38 @@ import json
 import os
 import random
 import re
+import socket
 import time
 from uuid import uuid4
 from typing import Any
 
+import httpx
 from openai import OpenAI
 
 from ...models.content import AudioBlock, ImageBlock, TextBlock, ToolUseBlock, VideoBlock
 from ...models.message import Message
 from ...models.tool import ToolSpec
 from ...models.trace import TokenUsage
+
+
+def _build_keepalive_http_client() -> httpx.Client:
+    """Build an httpx Client with TCP keepalive enabled.
+
+    Helps long-running chat completions survive idle reverse proxies that
+    silently drop connections.
+    """
+    socket_options = [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
+    if hasattr(socket, "TCP_KEEPALIVE"):  # macOS
+        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, 30))
+    if hasattr(socket, "TCP_KEEPIDLE"):  # Linux
+        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60))
+    if hasattr(socket, "TCP_KEEPINTVL"):
+        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10))
+    if hasattr(socket, "TCP_KEEPCNT"):
+        socket_options.append((socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3))
+
+    transport = httpx.HTTPTransport(socket_options=socket_options)
+    return httpx.Client(transport=transport)
 
 
 def _tool_spec_to_openai(spec: ToolSpec) -> dict[str, Any]:
@@ -183,6 +205,7 @@ def _message_to_openai(
     msg: Message,
     *,
     reasoning_key: str | None = None,
+    force_empty_reasoning: bool = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Convert our Message to OpenAI chat format.
 
@@ -191,6 +214,9 @@ def _message_to_openai(
 
     reasoning_key: if set, include reasoning_content under this key
                    (e.g. "reasoning" for OpenRouter, "reasoning_content" for DeepSeek V4).
+    force_empty_reasoning: if True, always include reasoning_key on assistant
+                   tool-call messages even when reasoning_content is empty.
+                   Required by Kimi/Moonshot thinking endpoints.
     """
     # Tool result messages need special handling
     tool_results = [b for b in msg.content if b.type == "tool_result"]
@@ -225,6 +251,8 @@ def _message_to_openai(
         }
         if reasoning_key and msg.reasoning_content:
             d[reasoning_key] = msg.reasoning_content
+        elif reasoning_key and force_empty_reasoning:
+            d[reasoning_key] = ""
         return d
 
     # Simple text message
@@ -257,6 +285,7 @@ class OpenAICompatProvider:
         self.client = OpenAI(
             api_key=resolved_key,
             base_url=base_url,
+            http_client=_build_keepalive_http_client(),
         )
 
     def chat(
@@ -276,10 +305,16 @@ class OpenAICompatProvider:
         # all others (Claude, GPT, GLM, etc.) do not accept it and would
         # either error or bloat the prompt.
         model_lower = self.model_id.lower()
+        is_kimi_thinking = (
+            any(s in model_lower for s in ("kimi", "moonshot"))
+            and self.extra_body.get("thinking", {}).get("type") != "disabled"
+        )
         if "deepseek-v4" in model_lower:
             reasoning_key = "reasoning_content"
         elif any(s in model_lower for s in ("deepseek-r1", "deepseek/deepseek-r", "qwq")):
             reasoning_key = "reasoning"
+        elif is_kimi_thinking:
+            reasoning_key = "reasoning_content"
         else:
             reasoning_key = None
 
@@ -287,7 +322,9 @@ class OpenAICompatProvider:
         oai_messages: list[dict[str, Any]] = []
         for msg in messages:
             converted = _message_to_openai(
-                msg, reasoning_key=reasoning_key,
+                msg,
+                reasoning_key=reasoning_key,
+                force_empty_reasoning=is_kimi_thinking,
             )
             if isinstance(converted, list):
                 oai_messages.extend(converted)

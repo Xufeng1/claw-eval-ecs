@@ -1,27 +1,27 @@
 """
 Search SERP — raw web skill
 
-GET https://scraperapi.novada.com/search
-Query params:
-    engine:     "google"
-    api_key:    <SERP_DEV_KEY>
+POST https://google.serper.dev/search
+Headers:
+    X-API-KEY:  <SERP_DEV_KEY>
+    Content-Type: application/json
+Body (JSON):
     q:          <query>
-    num:        <str int, 1-10>
+    num:        <int, 1-10>
     hl:         "zh" | "en"  (auto-detected from query)
     gl:         "cn" | "us"  (auto-detected from query)
-    start:      <int, 0-based offset>
-    fetch_mode: "static"
-    no_cache:   "true"
+    start:      <int, 1-based offset>
 
 Input:  query (str), timeout (int), num (int), start (int)
 Output: {"status": <int>, "output": <list[dict]>}
 """
 
+import json
 import os
 import re
 import requests
 
-SERP_API_URL = os.getenv("SERP_API_URL", "https://scraperapi.novada.com/search")
+SERP_API_URL = os.getenv("SERP_API_URL", "https://google.serper.dev/search")
 SERP_DEV_KEY = os.getenv("SERP_DEV_KEY", "YOUR_API_KEY")
 
 
@@ -53,35 +53,36 @@ def search_serp(
                 title, link, snippet, date, query.
     """
     hl, gl = _detect_language(query)
+    headers = {
+        'X-API-KEY': SERP_DEV_KEY,
+        'Content-Type': 'application/json'
+    }
     params = {
-        "engine": "google",
-        "api_key": SERP_DEV_KEY,
         "q": query,
-        "num": str(min(max(num, 1), 10)),
+        "num": min(max(num, 1), 10),
         "hl": hl,
         "gl": gl,
-        "start": str(max(start, 1)),
-        "fetch_mode": "static",
-        "no_cache": "true",
+        "start": max(start, 1),
     }
+    payload = json.dumps(params)
     try:
-        resp = requests.get(SERP_API_URL, params=params, timeout=timeout)
+        resp = requests.post(SERP_API_URL, data=payload, timeout=timeout, headers=headers)
         if raw_save_path and resp.status_code == 200:
             os.makedirs(os.path.dirname(raw_save_path) or ".", exist_ok=True)
             with open(raw_save_path, "w", encoding="utf-8") as f:
                 f.write(resp.text)
         if resp.status_code != 200:
             return {"status": resp.status_code, "output": []}
-        data = resp.json().get("data", {})
+        data = resp.json()
         results = [
             {
                 "title": item.get("title", ""),
-                "link": item.get("url", ""),
+                "link": item.get("link", ""),
                 "snippet": item.get("description", ""),
                 "date": item.get("date", ""),
                 "query": query,
             }
-            for item in data.get("organic_results", [])
+            for item in data.get("organic", [])
         ]
         return {"status": resp.status_code, "output": results}
     except Exception as e:
@@ -89,8 +90,6 @@ def search_serp(
 
 
 if __name__ == "__main__":
-    import json
-
     result = search_serp("Python web scraping", num=3)
     print(f"status={result['status']}  count={len(result['output'])}")
     print(json.dumps(result["output"], indent=2, ensure_ascii=False)[:1000])
